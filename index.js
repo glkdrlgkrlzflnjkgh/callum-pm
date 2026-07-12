@@ -627,6 +627,9 @@ const VALID_COMMANDS = [
 
 async function main() {
   const [command, pkgName, pkgVersion] = process.argv.slice(2);
+  if (command == null) {
+    info("No command given! If you meant to install your dependencies, run \"calpm install\"");
+  }
   if (!VALID_COMMANDS.includes(command)) {
     fail(`Unknown command: "${command}"`);
   }
@@ -673,9 +676,7 @@ async function main() {
     await install();
   }
 
-  if (command == null) {
-    info("No command given! If you meant to install your dependencies, run \"calpm install\"");
-  }
+
 
 
 }
