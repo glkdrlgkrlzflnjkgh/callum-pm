@@ -616,10 +616,20 @@ async function downloadAndExtract(pkg) {
 // ------------------------------------------------------------
 // MAIN
 // ------------------------------------------------------------
+const VALID_COMMANDS = [
+  "add",
+  "remove",
+  "update",
+  "list-unused",
+  "autoremove",
+  "install"
+];
 
 async function main() {
   const [command, pkgName, pkgVersion] = process.argv.slice(2);
-
+  if (!VALID_COMMANDS.includes(command)) {
+    fail(`Unknown command: "${command}"`);
+  }
   if (command === "add") {
     addDependencyToManifest(pkgName, pkgVersion);
     return;
@@ -656,6 +666,21 @@ async function main() {
     return;
   }
 
+  if (command === "install") {
+    if (pkgName != null) {
+      info("Install doesn't take any arguments! add a package to your dependencies via calpm add and then rerun!");
+    }
+    await install();
+  }
+
+  if (command == null) {
+    info("No command given! If you meant to install your dependencies, run \"calpm install\"");
+  }
+
+
+}
+
+async function install() {
   step("reading manifest");
   const manifest = readManifest();
   const rootDeps = manifest.dependencies || {};
@@ -673,6 +698,8 @@ async function main() {
 
   info(`installation complete!`);
 }
+
+
 
 main().catch((e) => {
   fail(e.message);
