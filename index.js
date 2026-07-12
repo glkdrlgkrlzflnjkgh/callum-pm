@@ -25,17 +25,17 @@ import fs from "node:fs";
 import https from "node:https";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import toml from "toml";
 import semver from "semver";
 import { info, step, error, fail } from "./log.js";
 import readlineSync from "readline-sync";
-
+import toml from "@iarna/toml";
 
 // ------------------------------------------------------------
 // MANIFEST
 // ------------------------------------------------------------
 
 function writeManifest(manifest) {
+  step("writing manifest to callum.toml");
   const lines = [];
   lines.push("[dependencies]");
 
@@ -398,6 +398,14 @@ function autoremoveUnusedDependencies() {
       fs.rmSync(installedDir, { recursive: true, force: true });
     }
   }
+  const manifest = toml.parse(fs.readFileSync("callum.toml", "utf8"));
+
+  for (const name of unused) {
+    step(`removing ${name} from manifest`);
+    delete manifest.dependencies[name];
+  }
+
+  fs.writeFileSync("callum.toml", toml.stringify(manifest));
 
   info("autoremoved unused dependencies");
 }
