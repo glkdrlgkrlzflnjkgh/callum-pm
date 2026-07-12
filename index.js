@@ -29,7 +29,8 @@ import semver from "semver";
 import { info, step, error, fail } from "./log.js";
 import readlineSync from "readline-sync";
 import toml from "@iarna/toml";
-
+import { performance } from 'node:perf_hooks';
+import { DEFAULT_MAX_VERSION } from "node:tls";
 // ------------------------------------------------------------
 // MANIFEST
 // ------------------------------------------------------------
@@ -62,9 +63,11 @@ function readManifest(createIfMissing = false) {
 
 function addDependencyToManifest(name, version) {
   if (!name) {
-    fail("usage: node index.js add <package> [version]");
+    fail("usage: calpm add <package> [version]");
   }
-
+  if (!semver.valid(version) && version != undefined) {
+    fail("the version needs to conform to the SemVer spec! (MAJOR.MINOR.PATCH)");
+  }
   const manifest = readManifest(true);
   const dependencies = manifest.dependencies || {};
   dependencies[name] = version || "*";
@@ -94,6 +97,7 @@ async function updateDependenciesInManifest(allowMajorUpgrades = false) {
   const updated = {};
 
   for (const [name, currentRange] of Object.entries(dependencies)) {
+    step(`Trying to update ${name}`)
     try {
       const meta = await fetchJson(`https://registry.npmjs.org/${name}`);
       const versions = Object.keys(meta.versions || {}).filter((version) => semver.valid(version));
@@ -121,6 +125,9 @@ async function updateDependenciesInManifest(allowMajorUpgrades = false) {
       updated[name] = targetVersion;
       if (targetVersion !== currentComparable.version) {
         info(`updated ${name} from ${currentComparable.version} to ${targetVersion}`);
+      }
+      else {
+        info(`no update needed for ${name} (current: ${currentComparable.version})`);
       }
     } catch (e) {
       error(`failed to update ${name}: ${e.message}`);
@@ -683,6 +690,7 @@ async function main() {
 }
 
 async function install() {
+  const start = performance.now();
   step("reading manifest");
   const manifest = readManifest();
   const rootDeps = manifest.dependencies || {};
@@ -697,8 +705,8 @@ async function install() {
 
   step("downloading and installing packages");
   await Promise.all(resolved.map((pkg) => downloadAndExtract(pkg)));
-
-  info(`installation complete!`);
+  const end = performance.now();
+  info(`installation complete, took ${end - start} ms!`);
 }
 
 
