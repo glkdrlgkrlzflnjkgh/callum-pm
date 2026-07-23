@@ -29,7 +29,6 @@ import semver from "semver";
 import { info, step, error, fail } from "./log.js";
 import readlineSync from "readline-sync";
 import toml from "@iarna/toml";
-import asyncPool from "tiny-async-pool";
 import { performance } from 'node:perf_hooks';
 import { DEFAULT_MAX_VERSION } from "node:tls";
 // ------------------------------------------------------------
@@ -709,10 +708,7 @@ async function install() {
   writeLockfile(resolved);
 
   step("downloading and installing packages");
-    const CONCURRENCY = 4;
-  await asyncPool(CONCURRENCY, resolved, async (pkg) => {
-    await downloadAndExtract(pkg);
-  });
+  await Promise.all(resolved.map((pkg) => downloadAndExtract(pkg)));
   const end = performance.now();
   info(`installation complete, took ${end - start} ms!`);
 }
