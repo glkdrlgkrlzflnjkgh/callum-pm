@@ -31,6 +31,7 @@ import readlineSync from "readline-sync";
 import toml from "@iarna/toml";
 import { performance } from 'node:perf_hooks';
 import { DEFAULT_MAX_VERSION } from "node:tls";
+import crypto from "node:crypto";
 // ------------------------------------------------------------
 // MANIFEST
 // ------------------------------------------------------------
