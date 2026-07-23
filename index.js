@@ -708,7 +708,10 @@ async function install() {
   writeLockfile(resolved);
 
   step("downloading and installing packages");
-  await Promise.all(resolved.map((pkg) => downloadAndExtract(pkg)));
+    const CONCURRENCY = 4;
+  await asyncPool(CONCURRENCY, resolved, async (pkg) => {
+    await downloadAndExtract(pkg);
+  });
   const end = performance.now();
   info(`installation complete, took ${end - start} ms!`);
 }
