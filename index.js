@@ -232,21 +232,27 @@ function readLockfile() {
   if (!fs.existsSync(lockfilePath)) return [];
 
   const content = fs.readFileSync(lockfilePath, "utf8");
+
+  // Regex that matches [[package]] on a single line
+  const entries = content.split(/\[\[package\]\]/).slice(1);
+
   const packages = [];
-  const entries = content.split(/\n\s*\[\[package\]\]\s*\n?/).slice(1);
 
   for (const entry of entries) {
     const lines = entry.split(/\n/).map((line) => line.trim()).filter(Boolean);
     const pkg = {};
+
     for (const line of lines) {
-      const match = line.match(/^(name|version|resolved)\s*=\s*"([^"]+)"/);
+      const match = line.match(/^(name|version|resolved|integrity)\s*=\s*"([^"]+)"/);
       if (match) pkg[match[1]] = match[2];
     }
+
     if (pkg.name) packages.push(pkg);
   }
 
   return packages;
 }
+
 
 function collectJavaScriptReferences(rootDir) {
   const references = new Set();
@@ -516,7 +522,11 @@ function writeLockfile(resolved) {
     out += `[[package]] # ${pkg.name}@${pkg.version}\n`;
     out += `name = "${pkg.name}"\n`;
     out += `version = "${pkg.version}"\n`;
-    out += `resolved = "${pkg.tarball}"\n\n`;
+    out += `resolved = "${pkg.tarball}"\n`;
+    if (pkg.integrity) {
+      out += `integrity = "${pkg.integrity}"\n`;
+    }
+    out += `\n`;
   }
   fs.writeFileSync("callum-lock.toml", out);
 }
@@ -552,8 +562,14 @@ function isAlreadyCorrectlyInstalled(pkg) {
 }
 
 // ------------------------------------------------------------
-// DOWNLOAD + EXTRACT
+// DOWNLOAD + EXTRACT + VERIFICATION
 // ------------------------------------------------------------
+
+function computeFileIntegrity(filePath) {
+  const data = fs.readFileSync(filePath);
+  const hash = crypto.createHash("sha512").update(data).digest("base64");
+  return `sha512-${hash}`;
+}
 
 async function downloadAndExtract(pkg) {
   const finalDir = path.join("node_modules", pkg.name);
@@ -571,38 +587,73 @@ async function downloadAndExtract(pkg) {
     fs.rmSync(temp, { recursive: true, force: true });
   }
 
-  if (fs.existsSync(cacheFile)) {
-    step(`cache hit for ${pkg.name}@${pkg.version}`);
-    fs.copyFileSync(cacheFile, destTgz);
-  } else {
-    step(`downloading ${pkg.name}@${pkg.version}`);
+  const maxAttempts = 3;
 
-    await new Promise((resolve, reject) => {
-      const file = fs.createWriteStream(destTgz);
-      https
-        .get(pkg.tarball, (res) => {
-          const total = Number(res.headers["content-length"]) || 0;
-          let downloaded = 0;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
 
-          res.on("data", (chunk) => {
-            downloaded += chunk.length;
-            if (total > 0) {
-              const pct = ((downloaded / total) * 100).toFixed(1);
-              process.stdout.write(`  ${pkg.name}: ${pct}%\r`);
-            }
-          });
+    // Use cache only on first attempt
+    if (attempt === 1 && fs.existsSync(cacheFile)) {
+      step(`cache hit for ${pkg.name}@${pkg.version}`);
+      fs.copyFileSync(cacheFile, destTgz);
+    } else {
+      if (attempt > 1) {
+        step(`retrying download for ${pkg.name}@${pkg.version} (attempt ${attempt})`);
+      } else {
+        step(`downloading ${pkg.name}@${pkg.version}`);
+      }
 
-          res.on("end", () => {
-            process.stdout.write("\n");
-          });
+      await new Promise((resolve, reject) => {
+        const file = fs.createWriteStream(destTgz);
+        https
+          .get(pkg.tarball, (res) => {
+            const total = Number(res.headers["content-length"]) || 0;
+            let downloaded = 0;
 
-          res.pipe(file);
-          file.on("finish", () => file.close(resolve));
-        })
-        .on("error", reject);
-    });
+            res.on("data", (chunk) => {
+              downloaded += chunk.length;
+              if (total > 0) {
+                const pct = ((downloaded / total) * 100).toFixed(1);
+                process.stdout.write(`  ${pkg.name}: ${pct}%\r`);
+              }
+            });
 
-    fs.copyFileSync(destTgz, cacheFile);
+            res.on("end", () => {
+              process.stdout.write("\n");
+            });
+
+            res.pipe(file);
+            file.on("finish", () => file.close(resolve));
+          })
+          .on("error", reject);
+      });
+
+      fs.copyFileSync(destTgz, cacheFile);
+    }
+
+    // Compute integrity
+    const actualIntegrity = computeFileIntegrity(destTgz);
+
+    // If lockfile has integrity, verify it
+    if (pkg.integrity && pkg.integrity !== actualIntegrity) {
+      error(`integrity mismatch for ${pkg.name}@${pkg.version}: expected ${pkg.integrity}, got ${actualIntegrity}`);
+
+      // Delete corrupted cache + tgz
+      if (fs.existsSync(cacheFile)) fs.rmSync(cacheFile, { force: true });
+      if (fs.existsSync(destTgz)) fs.rmSync(destTgz, { force: true });
+
+      if (attempt === maxAttempts) {
+        fail(`integrity check failed for ${pkg.name}@${pkg.version} after ${maxAttempts} attempts`);
+      }
+
+      continue; // retry
+    }
+
+    // First install: store integrity
+    if (!pkg.integrity) {
+      pkg.integrity = actualIntegrity;
+    }
+
+    break; // success
   }
 
   fs.mkdirSync(temp, { recursive: true });
@@ -705,11 +756,13 @@ async function install() {
   step("resolving dependencies");
   const resolved = await resolveAll(rootDeps);
 
-  step("writing lockfile");
-  writeLockfile(resolved);
+
 
   step("downloading and installing packages");
   await Promise.all(resolved.map((pkg) => downloadAndExtract(pkg)));
+
+  step("writing lockfile");
+  writeLockfile(resolved);
   const end = performance.now();
   info(`installation complete, took ${end - start} ms!`);
 }
