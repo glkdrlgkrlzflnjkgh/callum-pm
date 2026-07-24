@@ -486,6 +486,10 @@ async function resolveAll(rootDeps) {
   const seen = new Map();
   const queue = [...Object.entries(rootDeps)];
 
+  // Load lockfile integrity
+  const lockfile = readLockfile();
+  const lockMap = new Map(lockfile.map(p => [`${p.name}@${p.version}`, p]));
+
   while (queue.length) {
     const [name, range] = queue.shift();
 
@@ -494,6 +498,14 @@ async function resolveAll(rootDeps) {
     }
 
     const pkg = await resolvePackage(name, range);
+
+    // Attach lockfile integrity if present
+    const key = `${pkg.name}@${pkg.version}`;
+    const lockEntry = lockMap.get(key);
+    if (lockEntry && lockEntry.integrity) {
+      pkg.integrity = lockEntry.integrity;
+    }
+
     resolved.push(pkg);
     seen.set(name, pkg.version);
 
@@ -507,6 +519,7 @@ async function resolveAll(rootDeps) {
   detectConflicts(resolved);
   return resolved;
 }
+
 
 // ------------------------------------------------------------
 // LOCKFILE
@@ -650,30 +663,36 @@ async function downloadAndExtract(pkg) {
       fs.copyFileSync(destTgz, cacheFile);
     }
 
+    // Ensure file is fully written before hashing (extra safety on Windows)
+    const fd = fs.openSync(destTgz, "r+");
+    fs.fsyncSync(fd);
+    fs.closeSync(fd);
+
     // Compute integrity
     const actualIntegrity = computeFileIntegrity(destTgz);
-
     step(`Validating ${pkg.name}@${pkg.version}...`);
 
-    // If lockfile has integrity, verify it
-    if (pkg.integrity && pkg.integrity !== actualIntegrity) {
-      error(
-        `integrity mismatch for ${pkg.name}@${pkg.version}: expected ${pkg.integrity}, got ${actualIntegrity}`
-      );
+    // Integrity verification
+    if (pkg.integrity) {
+      if (pkg.integrity !== actualIntegrity) {
+        error(
+          `Integrity check FAILED for ${pkg.name}@${pkg.version}! Retrying!`
+        );
 
-      // Delete corrupted cache + tgz
-      if (fs.existsSync(cacheFile)) fs.rmSync(cacheFile, { force: true });
-      if (fs.existsSync(destTgz)) fs.rmSync(destTgz, { force: true });
+        // Delete corrupted cache + tgz
+        if (fs.existsSync(cacheFile)) fs.rmSync(cacheFile, { force: true });
+        if (fs.existsSync(destTgz)) fs.rmSync(destTgz, { force: true });
 
-      if (attempt === maxAttempts) {
-        fail(`integrity check failed for ${pkg.name}@${pkg.version} after ${maxAttempts} attempts`);
+        if (attempt === maxAttempts) {
+          fail(
+            `Integrity check FAILED for ${pkg.name}@${pkg.version} after ${maxAttempts} attempts`
+          );
+        }
+
+        continue; // retry
       }
-
-      continue; // retry
-    }
-
-    // First successful install: record integrity
-    if (!pkg.integrity) {
+    } else {
+      // First successful install: record integrity
       pkg.integrity = actualIntegrity;
     }
 
@@ -697,6 +716,7 @@ async function downloadAndExtract(pkg) {
 
   info(`installed ${pkg.name}@${pkg.version}`);
 }
+
 
 // ------------------------------------------------------------
 // MAIN
