@@ -727,7 +727,8 @@ const VALID_COMMANDS = [
   "update",
   "list-unused",
   "autoremove",
-  "install"
+  "install",
+  "help"
 ];
 
 async function main() {
@@ -738,6 +739,12 @@ async function main() {
   }
   if (!VALID_COMMANDS.includes(command)) {
     fail(`Unknown command: "${command}"`);
+  }
+  if (command === "help") {
+    console.log("Available commands:");
+    for (const name of Object.keys(VALID_COMMANDS)) {
+      console.log(`  - ${name}`);
+    }
   }
   if (command === "add") {
 
