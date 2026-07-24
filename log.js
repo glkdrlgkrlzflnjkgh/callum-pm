@@ -1,5 +1,5 @@
 import chalk from "chalk";
-
+import readline from "node:readline";
 export function info(msg) {
   console.log(chalk.blue.bold("INFO: ") + msg);
 }
@@ -31,4 +31,18 @@ export function fmt(str, vars) {
 export function fail(msg) {
   error(msg);
   process.exit(1);
+}
+
+export async function question(msg) {
+  return new Promise(resolve => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    rl.question(chalk.cyan.bold("QUESTION: ") + msg + " ", answer => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
 }

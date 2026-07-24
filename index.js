@@ -26,7 +26,7 @@ import https from "node:https";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import semver from "semver";
-import { info, step, error, fail } from "./log.js";
+import { info, step, error, fail, question } from "./log.js";
 import readlineSync from "readline-sync";
 import toml from "@iarna/toml";
 import { performance } from 'node:perf_hooks';
@@ -62,7 +62,7 @@ function readManifest(createIfMissing = false) {
   return toml.parse(raw);
 }
 
-function addDependencyToManifest(name, version) {
+async function addDependencyToManifest(name, version) {
   if (!name) {
     fail("usage: calpm add <package> [version]");
   }
@@ -73,6 +73,12 @@ function addDependencyToManifest(name, version) {
   const dependencies = manifest.dependencies || {};
   dependencies[name] = version || "*";
   manifest.dependencies = dependencies;
+  const ans = await question(`Is this correct? ${name}@${version} (y/N)`);
+
+  if (ans.toLowerCase() !== "y") {
+    info("Add cancelled.");
+    process.exit(0);
+  }
 
   writeManifest(manifest);
   info(`added ${name}@${version || "*"} to callum.toml`);
@@ -747,9 +753,7 @@ async function main() {
     }
   }
   if (command === "add") {
-
-    addDependencyToManifest(pkgName, pkgVersion);
-
+    await addDependencyToManifest(pkgName, pkgVersion);
     return;
   }
   
@@ -807,8 +811,6 @@ async function install() {
 
   step("resolving dependencies");
   const resolved = await resolveAll(rootDeps);
-
-
 
   step("downloading and installing packages");
   await Promise.all(resolved.map((pkg) => downloadAndExtract(pkg)));
