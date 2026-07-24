@@ -741,9 +741,9 @@ async function main() {
     fail(`Unknown command: "${command}"`);
   }
   if (command === "help") {
-    console.log("Available commands:");
-    for (const name of Object.keys(VALID_COMMANDS)) {
-      console.log(`  - ${name}`);
+    console.log("Valid Commands:")
+    for (const cmd of VALID_COMMANDS) {
+      console.log(` - ${cmd}`);
     }
   }
   if (command === "add") {
