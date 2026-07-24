@@ -578,9 +578,18 @@ function writeLockfile(resolved) {
 function getCachePath(pkg) {
   const home = process.env.HOME || process.env.USERPROFILE;
   const cacheDir = path.join(home, ".calpm", "cache");
+  warnIfCacheIsSynced(cacheDir);
   fs.mkdirSync(cacheDir, { recursive: true });
   return path.join(cacheDir, `${pkg.name}-${pkg.version}.tgz`);
 }
+
+function warnIfCacheIsSynced(cacheDir) {
+  const oneDrive = process.env.ONE_DRIVE || process.env.ONEDRIVE;
+  if (oneDrive && cacheDir.startsWith(oneDrive)) {
+    warn("Your calpm cache is inside a OneDrive folder. This may cause corruption.");
+  }
+}
+
 
 // ------------------------------------------------------------
 // INSTALL CHECK
