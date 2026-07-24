@@ -73,9 +73,9 @@ async function addDependencyToManifest(name, version) {
   const dependencies = manifest.dependencies || {};
   dependencies[name] = version || "*";
   manifest.dependencies = dependencies;
-  const ans = await question(`Is this correct? ${name}@${version} (y/N)`);
+  const ans = await question(`Is this correct? ${name}@${version || "*"} (yes/N)`);
 
-  if (ans.toLowerCase() !== "y") {
+  if (ans.toLowerCase() !== "yes") {
     info("Add cancelled.");
     process.exit(0);
   }
