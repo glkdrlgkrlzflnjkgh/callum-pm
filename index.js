@@ -735,7 +735,9 @@ async function downloadAndExtract(pkg) {
   }
 
   fs.mkdirSync(temp, { recursive: true });
+  step(`Extracting ${pkg.name}@${pkg.version}...`);
   execSync(`tar -xzf "${destTgz}" -C "${temp}"`);
+  step(`Done extracting ${pkg.name}@${pkg.version}!`)
 
   const pkgDir = path.join(temp, "package");
 
