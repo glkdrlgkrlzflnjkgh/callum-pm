@@ -575,20 +575,27 @@ function writeLockfile(resolved) {
 // CACHE
 // ------------------------------------------------------------
 
-function getCachePath(pkg) {
+async function getCachePath(pkg) {
   const home = process.env.HOME || process.env.USERPROFILE;
   const cacheDir = path.join(home, ".calpm", "cache");
-  warnIfCacheIsSynced(cacheDir);
+  await warnIfCacheIsSynced(cacheDir);
   fs.mkdirSync(cacheDir, { recursive: true });
   return path.join(cacheDir, `${pkg.name}-${pkg.version}.tgz`);
 }
 
-function warnIfCacheIsSynced(cacheDir) {
+async function warnIfCacheIsSynced(cacheDir) {
   const oneDrive = process.env.ONE_DRIVE || process.env.ONEDRIVE;
   if (oneDrive && cacheDir.startsWith(oneDrive)) {
     error("---- IMPORTANT ----");
     error("It seems like your CalPM cache folder is BEING SYNCED BY ONEDRIVE!!!!");
     error("Continuing **WILL** cause **SEVERE** cache corruption!");
+    var res = await question("Are you sure you want to continue?! (yes {not recommended!!}/no)");
+    if (res.toLowerCase() === "yes") {
+      // nothing to do here- we'll continue.
+    }
+    else {
+      fail("Install cancelled.");
+    }
   }
 }
 
@@ -632,7 +639,7 @@ async function downloadAndExtract(pkg) {
 
   const destTgz = path.join("node_modules", `${pkg.name}.tgz`);
   const temp = path.join("node_modules", `${pkg.name}-tmp`);
-  const cacheFile = getCachePath(pkg);
+  const cacheFile = await getCachePath(pkg);
 
   if (fs.existsSync(temp)) {
     fs.rmSync(temp, { recursive: true, force: true });
