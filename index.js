@@ -657,13 +657,18 @@ async function downloadAndExtract(pkg) {
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     // Use cache only on first attempt
+    // Fetch registry integrity BEFORE deciding whether to use cache
+    const meta = await fetchJson(`https://registry.npmjs.org/${pkg.name}`);
+    const versionInfo = meta.versions[pkg.version];
+    const registryIntegrity = versionInfo?.dist?.integrity;
+
+    // If registry provides integrity, use it.
+    // This is the authoritative hash.
+    if (registryIntegrity) {
+      pkg.integrity = registryIntegrity;
+    }
     if (attempt === 1 && fs.existsSync(cacheFile)) {
       step(`cache hit for ${pkg.name}@${pkg.version}`);
-      var integ =  computeFileIntegrity(cacheFile);
-      if (!pkg.integrity) {
-        attempt = 2;
-        continue;
-      }
       fs.copyFileSync(cacheFile, destTgz);
     } else {
       if (attempt > 1) {
