@@ -598,7 +598,7 @@ async function warnIfCacheIsSynced(cacheDir) {
   if (oneDrive && cacheDir.startsWith(oneDrive)) {
     error("---- IMPORTANT ----");
     error("It seems like your CalPM cache folder is BEING SYNCED BY ONEDRIVE!!!!");
-    error("This is really bad and **WILL** corrupt the cache!");
+    error("This is really bad and **WILL** corrupt the cache!!!!");
     var res = await question("Are you sure you want to continue?! (yes {not recommended!!}/no)");
     if (res.toLowerCase() === "yes") {
       // nothing to do here- we'll continue.
