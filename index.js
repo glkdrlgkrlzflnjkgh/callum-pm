@@ -599,7 +599,7 @@ async function warnIfCacheIsSynced(cacheDir) {
     error("---- IMPORTANT ----");
     error("It seems like your CalPM cache folder is BEING SYNCED BY ONEDRIVE!!!!");
     error(`This is VERY bad and ${chalk.bold.red("WILL")} corrupt the cache!!!!`);
-    fail("Bailing out to prevent horrifying bugs!");
+    fail("Aieee! Tried to install in a OneDrive synced folder!");
   }
 }
 
