@@ -659,6 +659,11 @@ async function downloadAndExtract(pkg) {
     // Use cache only on first attempt
     if (attempt === 1 && fs.existsSync(cacheFile)) {
       step(`cache hit for ${pkg.name}@${pkg.version}`);
+      var integ =  computeFileIntegrity(cacheFile);
+      if (!pkg.integrity) {
+        attempt++;
+        continue;
+      }
       fs.copyFileSync(cacheFile, destTgz);
     } else {
       if (attempt > 1) {
@@ -724,8 +729,10 @@ async function downloadAndExtract(pkg) {
         continue; // retry
       }
     } else {
-      // First successful install: record integrity
-      pkg.integrity = actualIntegrity;
+      const meta = await fetchJson(`https://registry.npmjs.org/${pkg.name}`);
+      const versionInfo = meta.versions[pkg.version];
+      const registryIntegrity = versionInfo.dist.integrity;
+      pkg.integrity = registryIntegrity;
     }
 
     info(`Integrity check ${chalk.bold.green("PASSED")} for ${pkg.name}@${pkg.version}`);
