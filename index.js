@@ -588,7 +588,7 @@ function warnIfCacheIsSynced(cacheDir) {
   if (oneDrive && cacheDir.startsWith(oneDrive)) {
     error("---- IMPORTANT ----");
     error("It seems like your CalPM cache folder is BEING SYNCED BY ONEDRIVE!!!!");
-    error("This is VERY BAD and **WILL** CAUSE CACHE CORRUPTION!!!!!");
+    error("Continuing **WILL** cause **SEVERE** cache corruption!");
   }
 }
 
