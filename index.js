@@ -668,10 +668,12 @@ async function downloadAndExtract(pkg) {
       info(`Registry has an integrity hash for ${pkg.name}@${pkg.version}, using that as integrity hash!`)
       pkg.integrity = registryIntegrity;
     }
-    if (attempt === 1 && fs.existsSync(cacheFile)) {
+    const isCachedValid = registryIntegrity === computeFileIntegrity(cacheFile);
+    if (attempt === 1 && fs.existsSync(cacheFile) && isCachedValid) {
       step(`cache hit for ${pkg.name}@${pkg.version}`);
       fs.copyFileSync(cacheFile, destTgz);
     } else {
+      info(`Cachefile for ${pkg.name}@${pkg.version} doesn't exist or got tampered with, downloading fresh!`);
       if (attempt > 1) {
         step(`retrying download for ${pkg.name}@${pkg.version} (attempt ${attempt})`);
       } else {
