@@ -661,7 +661,7 @@ async function downloadAndExtract(pkg) {
       step(`cache hit for ${pkg.name}@${pkg.version}`);
       var integ =  computeFileIntegrity(cacheFile);
       if (!pkg.integrity) {
-        attempt++;
+        attempt = 2;
         continue;
       }
       fs.copyFileSync(cacheFile, destTgz);
