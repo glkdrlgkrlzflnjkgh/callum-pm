@@ -586,7 +586,9 @@ function getCachePath(pkg) {
 function warnIfCacheIsSynced(cacheDir) {
   const oneDrive = process.env.ONE_DRIVE || process.env.ONEDRIVE;
   if (oneDrive && cacheDir.startsWith(oneDrive)) {
-    error("Your calpm cache is inside a OneDrive folder!!!! this is very bad and will probably cause wasted writes due to OneDrive corrupting the cache!!!!");
+    error("---- IMPORTANT ----");
+    error("It seems like your CalPM cache folder is BEING SYNCED BY ONEDRIVE!!!!");
+    error("This is VERY BAD and **WILL** CAUSE CACHE CORRUPTION!!!!!");
   }
 }
 
