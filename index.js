@@ -557,6 +557,9 @@ function writeLockfile(resolved) {
   out += "# ------------------------------------------------------------\n\n";
 
   for (const pkg of resolved) {
+    if (!fs.existsSync("callum-lock.toml")) {
+      fail("aieee! Callum-lock.toml got destroyed while we were generating it!");
+    }
     const key = `${pkg.name}@${pkg.version}`;
     const previous = existingMap.get(key);
 
