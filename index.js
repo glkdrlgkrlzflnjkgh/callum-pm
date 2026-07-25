@@ -32,6 +32,7 @@ import toml from "@iarna/toml";
 import { performance } from 'node:perf_hooks';
 import { DEFAULT_MAX_VERSION } from "node:tls";
 import crypto from "node:crypto";
+import chalk from "chalk";
 // ------------------------------------------------------------
 // MANIFEST
 // ------------------------------------------------------------
@@ -202,7 +203,7 @@ function findDependencyReferences(name) {
   return results;
 }
 
-function removeDependencyFromManifest(name, breakCodebase = false) {
+async function removeDependencyFromManifest(name, breakCodebase = false) {
   if (!name) {
     fail("usage: node index.js remove <package> [--break-codebase]");
   }
@@ -218,7 +219,16 @@ function removeDependencyFromManifest(name, breakCodebase = false) {
   if (references.length > 0 && !breakCodebase) {
     fail(`refusing to remove "${name}" because it is still referenced in the codebase.\nPlease remove those references first or rerun with --break-codebase to force removal. (The following files are affected: ${references.join(", \n")})`);
   }
-
+  var res = undefined;
+  if (breakCodebase) {
+    res = await question("WARNING!!!! --break-codebase has been passed and continuing **WILL** delete the package, even if you still use it. are you sure? (yes/N)");
+  }
+  if (res.toLowerCase() === "yes") {
+    // nothing to do here, keep going.
+  }
+  else {
+    fail("User didn't agree to the operation, bailing out!")
+  }
   delete dependencies[name];
   manifest.dependencies = dependencies;
   writeManifest(manifest);
@@ -700,7 +710,7 @@ async function downloadAndExtract(pkg) {
     if (pkg.integrity) {
       if (pkg.integrity !== actualIntegrity) {
         error(
-          `Integrity check FAILED for ${pkg.name}@${pkg.version}! Retrying!`
+          `Integrity check ${chalk.bold.red("FAILED")} for ${pkg.name}@${pkg.version}! Retrying!`
         );
 
         // Delete corrupted cache + tgz
@@ -709,7 +719,7 @@ async function downloadAndExtract(pkg) {
 
         if (attempt === maxAttempts) {
           fail(
-            `Integrity check FAILED for ${pkg.name}@${pkg.version} after ${maxAttempts} attempts`
+            `Integrity check ${chalk.bold.red("FAILED")} for ${pkg.name}@${pkg.version} after ${maxAttempts} attempts`
           );
         }
 
@@ -720,7 +730,7 @@ async function downloadAndExtract(pkg) {
       pkg.integrity = actualIntegrity;
     }
 
-    info(`Integrity check PASSED for ${pkg.name}@${pkg.version}`);
+    info(`Integrity check ${chalk.bold.green("PASSED")} for ${pkg.name}@${pkg.version}`);
     break; // success
   }
 
@@ -778,7 +788,7 @@ async function main() {
 
   if (command === "remove") {
     const breakCodebase = process.argv.includes("--break-codebase");
-    removeDependencyFromManifest(pkgName, breakCodebase);
+    await removeDependencyFromManifest(pkgName, breakCodebase);
     return;
   }
 
