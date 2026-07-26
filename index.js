@@ -845,6 +845,9 @@ async function main() {
 }
 
 async function install() {
+  if (process.arch !== "x64" && process.arch !== "arm64") {
+    fail("32 bit processors are unsupported, exiting...");
+  }
   const start = performance.now();
   step("reading manifest");
   const manifest = readManifest();
