@@ -632,6 +632,7 @@ function isAlreadyCorrectlyInstalled(pkg) {
 // ------------------------------------------------------------
 
 function computeFileIntegrity(filePath) {
+
   const data = fs.readFileSync(filePath);
   const hash = crypto.createHash("sha512").update(data).digest("base64");
   return `sha512-${hash}`;
@@ -668,7 +669,11 @@ async function downloadAndExtract(pkg) {
       info(`Registry has an integrity hash for ${pkg.name}@${pkg.version}, using that as integrity hash!`)
       pkg.integrity = registryIntegrity;
     }
-    const isCachedValid = registryIntegrity === computeFileIntegrity(cacheFile);
+    const isCachedValid = false;
+    if (!fs.existsSync(cacheFile)) isCachedValid = true;
+    if (registryIntegrity === computeFileIntegrity(cacheFile) && !isCachedValid) {
+      isCachedValid = true;
+    }
     if (attempt === 1 && fs.existsSync(cacheFile) && isCachedValid) {
       step(`cache hit for ${pkg.name}@${pkg.version}`);
       fs.copyFileSync(cacheFile, destTgz);
