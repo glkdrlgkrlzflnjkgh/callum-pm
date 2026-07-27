@@ -505,7 +505,11 @@ async function resolveAll(rootDeps) {
 
   // Load lockfile integrity
   const lockfile = readLockfile();
-  const lockMap = new Map(lockfile.map(p => [`${p.name}@${p.version}`, p]));
+
+  var lockMap = undefined;
+  if (lockfile.length != 0) {
+    lockMap = new Map(lockfile.map(p => [`${p.name}@${p.version}`, p]));
+  }
 
   while (queue.length) {
     const [name, range] = queue.shift();
@@ -518,7 +522,7 @@ async function resolveAll(rootDeps) {
 
     // Attach lockfile integrity if present
     const key = `${pkg.name}@${pkg.version}`;
-    const lockEntry = lockMap.get(key);
+    const lockEntry = lockMap ? lockMap.get(key) : undefined;
     if (lockEntry && lockEntry.integrity) {
       pkg.integrity = lockEntry.integrity;
     }
@@ -581,7 +585,7 @@ function writeLockfile(resolved) {
 
   fs.writeFileSync("callum-lock.toml", out);
   if (!fs.existsSync("callum-lock.toml")) {
-    fail("aieee! Callum-lock.toml got destroyed even though we wrote it to disk!!!");
+    fail("Aieee! Callum-lock.toml got destroyed even though we wrote it to disk!!!");
   }
 }
 
@@ -646,7 +650,13 @@ async function downloadAndExtract(pkg) {
     info(`skipped ${pkg.name}@${pkg.version} (Requirements are already satisfied)`);
     return;
   }
+  
+  const lockfile = readLockfile();
 
+  var lockMap = undefined;
+  if (lockfile.length != 0) {
+    lockMap = new Map(lockfile.map(p => [`${p.name}@${p.version}`, p]));
+  }
   const destTgz = path.join("node_modules", `${pkg.name}.tgz`);
   const temp = path.join("node_modules", `${pkg.name}-tmp`);
   const cacheFile = await getCachePath(pkg);
@@ -656,7 +666,6 @@ async function downloadAndExtract(pkg) {
   }
 
   const maxAttempts = 3;
-
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     // Use cache only on first attempt
     // Fetch registry integrity BEFORE deciding whether to use cache
@@ -670,8 +679,13 @@ async function downloadAndExtract(pkg) {
       info(`Registry has an integrity hash for ${pkg.name}@${pkg.version}, using that as integrity hash!`)
       pkg.integrity = registryIntegrity;
     }
+    var inLockFile = false;
+    if (lockMap != undefined && lockMap.has(`${pkg.name}@${pkg.version}`)) {
+      inLockFile = true;
+    }
+    
     var isCachedValid = false;
-    if (fs.existsSync(cacheFile) && registryIntegrity === computeFileIntegrity(cacheFile)) {
+    if (fs.existsSync(cacheFile) && registryIntegrity === computeFileIntegrity(cacheFile) && ! inLockFile) {
       isCachedValid = true;
     }
     if (attempt === 1 && fs.existsSync(cacheFile) && isCachedValid) {
@@ -875,5 +889,6 @@ async function install() {
 
 
 main().catch((e) => {
-  fail(e.message);
+  error(e.message);
+  fail(`Trace ${e.stack}`);
 });
