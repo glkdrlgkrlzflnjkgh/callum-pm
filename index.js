@@ -221,14 +221,15 @@ async function removeDependencyFromManifest(name, breakCodebase = false) {
   }
   var res = undefined;
   if (breakCodebase) {
-    res = await question("WARNING!!!! --break-codebase has been passed and continuing **WILL** delete the package, even if you still use it. are you sure? (yes/N)");
+    const res = await question(
+      "WARNING!!!! --break-codebase has been passed and continuing WILL delete the package, even if you still use it. Are you sure? (yes/N)"
+    );
+
+    if (!res || res.toLowerCase() !== "yes") {
+      fail("User didn't agree to the operation, bailing out!");
+    }
   }
-  if (res.toLowerCase() === "yes") {
-    // nothing to do here, keep going.
-  }
-  else {
-    fail("User didn't agree to the operation, bailing out!")
-  }
+
   delete dependencies[name];
   manifest.dependencies = dependencies;
   writeManifest(manifest);
