@@ -676,7 +676,6 @@ async function downloadAndExtract(pkg) {
     // If registry provides integrity, use it.
     // This is the authoritative hash.
     if (registryIntegrity) {
-      info(`Registry has an integrity hash for ${pkg.name}@${pkg.version}, using that as integrity hash!`)
       pkg.integrity = registryIntegrity;
     }
 
