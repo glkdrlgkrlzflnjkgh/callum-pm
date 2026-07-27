@@ -670,8 +670,7 @@ async function downloadAndExtract(pkg) {
       pkg.integrity = registryIntegrity;
     }
     var isCachedValid = false;
-    if (!fs.existsSync(cacheFile)) isCachedValid = true;
-    if (registryIntegrity === computeFileIntegrity(cacheFile) && !isCachedValid) {
+    if (fs.existsSync(cacheFile) && registryIntegrity === computeFileIntegrity(cacheFile)) {
       isCachedValid = true;
     }
     if (attempt === 1 && fs.existsSync(cacheFile) && isCachedValid) {
