@@ -125,12 +125,21 @@ async function updateDependenciesInManifest(allowMajorUpgrades = false) {
         continue;
       }
 
+
+
       const currentComparable = baseVersion || semver.parse(latestVersion);
       const targetVersion = semver.gt(latestSafeVersion, currentComparable)
         ? latestSafeVersion
         : currentComparable.version;
-
+      
       updated[name] = targetVersion;
+      // detect major bump
+      if (semver.major(latestVersion) > semver.major(baseVersion.version) && ! allowMajorUpgrades) {
+        info(
+          `NOTE: there is a major update available for ${name} (current: ${baseVersion.version}, latest: ${latestVersion})`
+        );
+        info(`run calpm update --allow-major-upgrades to install major updates`);
+      }
       if (targetVersion !== currentComparable.version) {
         info(`updated ${name} from ${currentComparable.version} to ${targetVersion}`);
       }
