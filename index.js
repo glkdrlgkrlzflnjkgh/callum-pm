@@ -679,13 +679,10 @@ async function downloadAndExtract(pkg) {
       info(`Registry has an integrity hash for ${pkg.name}@${pkg.version}, using that as integrity hash!`)
       pkg.integrity = registryIntegrity;
     }
-    var inLockFile = false;
-    if (lockMap != undefined && lockMap.has(`${pkg.name}@${pkg.version}`)) {
-      inLockFile = true;
-    }
+
     
     var isCachedValid = false;
-    if (fs.existsSync(cacheFile) && registryIntegrity === computeFileIntegrity(cacheFile) && ! inLockFile) {
+    if (registryIntegrity === computeFileIntegrity(cacheFile)) {
       isCachedValid = true;
     }
     if (attempt === 1 && fs.existsSync(cacheFile) && isCachedValid) {
