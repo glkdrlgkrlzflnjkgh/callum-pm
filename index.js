@@ -681,15 +681,10 @@ async function downloadAndExtract(pkg) {
     }
 
     
-    var isCachedValid = false;
-    if (registryIntegrity === computeFileIntegrity(cacheFile)) {
-      isCachedValid = true;
-    }
-    if (attempt === 1 && fs.existsSync(cacheFile) && isCachedValid) {
+    if (attempt === 1 && fs.existsSync(cacheFile)) {
       step(`cache hit for ${pkg.name}@${pkg.version}`);
       fs.copyFileSync(cacheFile, destTgz);
     } else {
-      info(`Cachefile for ${pkg.name}@${pkg.version} doesn't exist or got tampered with, downloading fresh!`);
       if (attempt > 1) {
         step(`retrying download for ${pkg.name}@${pkg.version} (attempt ${attempt})`);
       } else {
