@@ -155,6 +155,7 @@ async function updateDependenciesInManifest(allowMajorUpgrades = false) {
   manifest.dependencies = updated;
   writeManifest(manifest);
   info("dependency update complete");
+  info("note: this only updated the manifest. Please run calpm install to apply the changes!");
 }
 
 function findDependencyReferences(name) {
