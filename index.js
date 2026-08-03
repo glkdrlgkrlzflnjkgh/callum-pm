@@ -427,6 +427,7 @@ function autoremoveUnusedDependencies() {
       break;
     }
   }
+  // FIXME: This should use log.js's question() function.
   const confirm = readlineSync.question("Are you sure you want to continue? (yes/N): ");
   if (confirm.toLowerCase() !== "yes") {
     info("operation cancelled");
