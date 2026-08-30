@@ -742,7 +742,7 @@ async function downloadAndExtract(pkg) {
     if (pkg.integrity) {
       if (pkg.integrity !== actualIntegrity) {
         error(
-          `Integrity check ${chalk.bold.red("FAILED")} for ${pkg.name}@${pkg.version}! Retrying!`
+          `Integrity check ${chalk.bold.red("FAILED")} for ${pkg.name}@${pkg.version}! Retrying! (giving up in ${maxAttempts - attempt} attempts...)`
         );
 
         // Delete corrupted cache + tgz
