@@ -65,16 +65,22 @@ function readManifest(createIfMissing = false) {
 
 async function addDependencyToManifest(name, version) {
   if (!name) {
-    fail("usage: calpm add <package> [version]");
+    fail("usage: calpm add <package> <version>");
   }
   if (!semver.valid(version) && version != undefined) {
     fail("the version needs to conform to the SemVer spec! (MAJOR.MINOR.PATCH)");
   }
+  else if (!version) {
+	fail("No version specified! Specify a version explicitly! (MAJOR.MINOR.PATCH)");
+  }
+  else if (version === "*") {
+	fail("Using * as a version is not allowed! It breaks the updater! Specify a version explicitly! (MAJOR.MINOR.PATCH)");
+  }
   const manifest = readManifest(true);
   const dependencies = manifest.dependencies || {};
-  dependencies[name] = version || "*";
+  dependencies[name] = version;
   manifest.dependencies = dependencies;
-  const ans = await question(`Is this correct? ${name}@${version || "*"} (yes/N)`);
+  const ans = await question(`Is this correct? ${name}@${version} (yes/N)`);
 
   if (ans.toLowerCase() !== "yes") {
     info("Add cancelled.");
@@ -82,7 +88,7 @@ async function addDependencyToManifest(name, version) {
   }
 
   writeManifest(manifest);
-  info(`added ${name}@${version || "*"} to callum.toml`);
+  info(`added ${name}@${version} to callum.toml`);
 }
 
 function getBaseVersion(range) {
@@ -108,6 +114,9 @@ async function updateDependenciesInManifest(allowMajorUpgrades = false) {
     step(`Trying to update ${name}`)
     try {
       const meta = await fetchJson(`https://registry.npmjs.org/${name}`);
+	  if (!meta) {
+		fail(`failed to fetch metadata for ${name}`);
+	  }
       const versions = Object.keys(meta.versions || {}).filter((version) => semver.valid(version));
       if (!versions.length) {
         updated[name] = currentRange;
@@ -138,6 +147,7 @@ async function updateDependenciesInManifest(allowMajorUpgrades = false) {
         info(
           `NOTE: there is a major update available for ${name} (current: ${baseVersion.version}, latest: ${latestVersion})`
         );
+		info("By default, calpm will not update to a new major version to avoid breaking changes.");
         info(`run calpm update --allow-major-upgrades to install major updates`);
       }
       if (targetVersion !== currentComparable.version) {
@@ -147,7 +157,7 @@ async function updateDependenciesInManifest(allowMajorUpgrades = false) {
         info(`no update needed for ${name} (current: ${currentComparable.version})`);
       }
     } catch (e) {
-      error(`failed to update ${name}: ${e.message}`);
+      error(`failed to update ${name}: ${e.message} stack: ${e.stack}`);
       updated[name] = currentRange;
     }
   }
