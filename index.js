@@ -489,7 +489,6 @@ function fetchJson(url) {
 // ------------------------------------------------------------
 
 async function resolvePackage(name, range) {
-  step(`resolving ${name}@${range}`);
   const meta = await fetchJson(`https://registry.npmjs.org/${name}`);
   const versions = Object.keys(meta.versions || {});
   const picked = semver.maxSatisfying(versions, range);
