@@ -26,7 +26,7 @@ import https from "node:https";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import semver from "semver";
-import { Info, Step, Error, Fail, Question } from "./log.js";
+import { Info, Step, Error, Fail, Question, Warn } from "./log.js";
 import readlineSync from "readline-sync";
 import toml from "@iarna/toml";
 import { performance } from 'node:perf_hooks';
@@ -631,8 +631,14 @@ async function warnIfCacheIsSynced(cacheDir) {
   if (oneDrive && cacheDir.startsWith(oneDrive)) {
     Error("---- IMPORTANT ----");
     Error("It seems like your CalPM cache folder is BEING SYNCED BY ONEDRIVE!!!!");
-    Error(`This is VERY bad and ${chalk.bold.red("WILL")} corrupt the cache!!!!`);
-    Fail("Bailing out to prevent horrifying bugs!");
+    Error(`If you continue, you ${chalk.redBright("***RISK***")} cache corruption!`);
+    const res = await Question("Are you sure you want to continue? (y/n)")
+	if (!res || res != "y") {
+		fail("Bailing out! User didn't consent.");
+	}
+	else {
+		// do nothing. :C
+	}
   }
 }
 
@@ -673,6 +679,9 @@ async function downloadAndExtract(pkg) {
   if (isAlreadyCorrectlyInstalled(pkg)) {
     Info(`skipped ${pkg.name}@${pkg.version} (Requirements are already satisfied)`);
     return;
+  }
+  else {
+	Warn(`${pkg.name}@${pkg.version} is NOT installed properly! It will be installed.`);
   }
   
   const lockfile = readLockfile();
