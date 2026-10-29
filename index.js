@@ -681,7 +681,7 @@ async function downloadAndExtract(pkg) {
     return;
   }
   else {
-	Warn(`${pkg.name}@${pkg.version} is NOT installed properly! It will be installed.`);
+	Warn(`${pkg.name}@${pkg.version} needs to be installed!`);
   }
   
   const lockfile = readLockfile();
