@@ -23,7 +23,7 @@ SOFTWARE.
 */
 import chalk from "chalk";
 import readline from "node:readline";
-export function info(msg) {
+export function Info(msg) {
   console.log(chalk.blue.bold("INFO: ") + msg);
 }
 

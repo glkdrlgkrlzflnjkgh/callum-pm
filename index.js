@@ -26,7 +26,7 @@ import https from "node:https";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import semver from "semver";
-import { info, step, error, fail, question } from "./log.js";
+import { Info, step, error, fail, question } from "./log.js";
 import readlineSync from "readline-sync";
 import toml from "@iarna/toml";
 import { performance } from 'node:perf_hooks';
@@ -83,12 +83,12 @@ async function addDependencyToManifest(name, version) {
   const ans = await question(`Is this correct? ${name}@${version} (yes/N)`);
 
   if (ans.toLowerCase() !== "yes") {
-    info("Add cancelled.");
+    Info("Add cancelled.");
     process.exit(0);
   }
 
   writeManifest(manifest);
-  info(`added ${name}@${version} to callum.toml`);
+  Info(`added ${name}@${version} to callum.toml`);
 }
 
 function getBaseVersion(range) {
@@ -144,17 +144,17 @@ async function updateDependenciesInManifest(allowMajorUpgrades = false) {
       updated[name] = targetVersion;
       // detect major bump
       if (semver.major(latestVersion) > semver.major(baseVersion.version) && ! allowMajorUpgrades) {
-        info(
+        Info(
           `NOTE: there is a major update available for ${name} (current: ${baseVersion.version}, latest: ${latestVersion})`
         );
-		info("By default, calpm will not update to a new major version to avoid breaking changes.");
-        info(`run calpm update --allow-major-upgrades to install major updates`);
+		Info("By default, calpm will not update to a new major version to avoid breaking changes.");
+        Info(`run calpm update --allow-major-upgrades to install major updates`);
       }
       if (targetVersion !== currentComparable.version) {
-        info(`updated ${name} from ${currentComparable.version} to ${targetVersion}`);
+        Info(`updated ${name} from ${currentComparable.version} to ${targetVersion}`);
       }
       else {
-        info(`no update needed for ${name} (current: ${currentComparable.version})`);
+        Info(`no update needed for ${name} (current: ${currentComparable.version})`);
       }
     } catch (e) {
       error(`failed to update ${name}: ${e.message} stack: ${e.stack}`);
@@ -164,8 +164,8 @@ async function updateDependenciesInManifest(allowMajorUpgrades = false) {
 
   manifest.dependencies = updated;
   writeManifest(manifest);
-  info("dependency update complete");
-  info("note: this only updated the manifest. Please run calpm install to apply the changes!");
+  Info("dependency update complete");
+  Info("note: this only updated the manifest. Please run calpm install to apply the changes!");
 }
 
 function findDependencyReferences(name) {
@@ -257,11 +257,11 @@ async function removeDependencyFromManifest(name, breakCodebase = false) {
   const installedDir = path.join(process.cwd(), "node_modules", name);
   if (fs.existsSync(installedDir)) {
     fs.rmSync(installedDir, { recursive: true, force: true });
-    info(`removed ${name} from node_modules`);
+    Info(`removed ${name} from node_modules`);
   }
 
-  info(`removed ${name} from callum.toml`);
-  info(`After this operation, you should run autoremove-unused to remove any unused dependencies that this operation may have caused.`)
+  Info(`removed ${name} from callum.toml`);
+  Info(`After this operation, you should run autoremove-unused to remove any unused dependencies that this operation may have caused.`)
 }
 
 function readLockfile() {
@@ -424,23 +424,23 @@ function listUnusedDependencies() {
 function autoremoveUnusedDependencies() {
   const unused = listUnusedDependencies();
   if (!unused.length) {
-    info("no unused dependencies found");
+    Info("no unused dependencies found");
     return;
   }
   var unusedCount = 0;
-  info("The following packages will be REMOVED:");
+  Info("The following packages will be REMOVED:");
   for (const name of unused) {
-    info(`- ${name}`);
+    Info(`- ${name}`);
     unusedCount++;
     if (unusedCount >= 20) { 
-      info("etc... (to see full list, run list-unused)");
+      Info("etc... (to see full list, run list-unused)");
       break;
     }
   }
   // FIXME: This should use log.js's question() function.
   const confirm = readlineSync.question("Are you sure you want to continue? (yes/N): ");
   if (confirm.toLowerCase() !== "yes") {
-    info("operation cancelled");
+    Info("operation cancelled");
     return;
   }
   for (const name of unused) {
@@ -459,7 +459,7 @@ function autoremoveUnusedDependencies() {
 
   fs.writeFileSync("callum.toml", toml.stringify(manifest));
 
-  info("autoremoved unused dependencies");
+  Info("autoremoved unused dependencies");
 }
 
 // ------------------------------------------------------------
@@ -489,6 +489,7 @@ function fetchJson(url) {
 // ------------------------------------------------------------
 
 async function resolvePackage(name, range) {
+  Info(`Attempting to resolve ${name}`);
   const meta = await fetchJson(`https://registry.npmjs.org/${name}`);
   const versions = Object.keys(meta.versions || {});
   const picked = semver.maxSatisfying(versions, range);
@@ -496,6 +497,7 @@ async function resolvePackage(name, range) {
     fail(`no version of "${name}" satisfies range "${range}"`);
   }
   const info = meta.versions[picked];
+  Info(`Resolved ${name} to version ${picked.toString()}`);
   return {
     name,
     version: picked,
@@ -504,64 +506,82 @@ async function resolvePackage(name, range) {
   };
 }
 
-function detectConflicts(resolved) {
-  const seen = new Map();
-  for (const pkg of resolved) {
-    if (!seen.has(pkg.name)) {
-      seen.set(pkg.name, pkg.version);
-      continue;
+function detectConflicts(resolved, requestedRanges) {
+    for (const [name, info] of requestedRanges.entries()) {
+        const version = resolved.find(p => p.name === name)?.version;
+
+        if (!version)
+            continue;
+
+        for (const range of info.ranges) {
+            if (!semver.satisfies(version, range)) {
+                fail(
+                    `dependency conflict for "${name}": ` +
+                    `${version} does not satisfy ${range}`
+                );
+            }
+        }
     }
-    const existing = seen.get(pkg.name);
-    if (existing !== pkg.version) {
-      fail(`dependency conflict for "${pkg.name}": ${existing} vs ${pkg.version}`);
-    }
-  }
 }
 
 async function resolveAll(rootDeps) {
-  const resolved = [];
-  const seen = new Map();
-  const queue = [...Object.entries(rootDeps)];
+	const resolved = [];
+	const seen = new Map();
+	const queue = [...Object.entries(rootDeps)];
 
-  // Load lockfile integrity
-  const lockfile = readLockfile();
+	// Load lockfile integrity
+	const lockfile = readLockfile();
 
-  var lockMap = undefined;
-  if (lockfile.length != 0) {
-    lockMap = new Map(lockfile.map(p => [`${p.name}@${p.version}`, p]));
-  }
+	let lockMap;
+	if (lockfile.length !== 0) {
+		lockMap = new Map(
+		lockfile.map(p => [`${p.name}@${p.version}`, p])
+		);
+	}
 
-  while (queue.length) {
-    const [name, range] = queue.shift();
+	while (queue.length) {
+		const [name, range] = queue.shift();
 
-    if (seen.has(name)) {
-      continue;
-    }
+		const pkg = await resolvePackage(name, range);
 
-    const pkg = await resolvePackage(name, range);
+		// ----- CONFLICT DETECTION -----
 
-    // Attach lockfile integrity if present
-    const key = `${pkg.name}@${pkg.version}`;
-    const lockEntry = lockMap ? lockMap.get(key) : undefined;
-    if (lockEntry && lockEntry.integrity) {
-      pkg.integrity = lockEntry.integrity;
-    }
+		if (seen.has(pkg.name)) {
+		const existingVersion = seen.get(pkg.name);
 
-    resolved.push(pkg);
-    seen.set(name, pkg.version);
+		if (existingVersion !== pkg.version) {
+			error("DEPENDENCY CONFLICT DETECTED!");
+			error(
+			`Package "${pkg.name}" was requested as both ` +
+			`${existingVersion} and ${pkg.version}`
+			);
+			fail("Bailing out!");
+		}
 
-    for (const [depName, depRange] of Object.entries(pkg.dependencies)) {
-      if (!seen.has(depName)) {
-        queue.push([depName, depRange]);
-      }
-    }
-  }
+		continue;
+		}
 
-  detectConflicts(resolved);
-  return resolved;
+		// -----------------------------
+
+		const key = `${pkg.name}@${pkg.version}`;
+		const lockEntry = lockMap
+		? lockMap.get(key)
+		: undefined;
+
+		if (lockEntry && lockEntry.integrity) {
+		pkg.integrity = lockEntry.integrity;
+		}
+
+		resolved.push(pkg);
+		seen.set(pkg.name, pkg.version);
+
+		for (const [depName, depRange] of Object.entries(pkg.dependencies)) {
+		queue.push([depName, depRange]);
+		}
+	}
+
+	return resolved;
 }
-
-
 // ------------------------------------------------------------
 // LOCKFILE
 // ------------------------------------------------------------
@@ -667,7 +687,7 @@ async function downloadAndExtract(pkg) {
   const finalDir = path.join("node_modules", pkg.name);
 
   if (isAlreadyCorrectlyInstalled(pkg)) {
-    info(`skipped ${pkg.name}@${pkg.version} (Requirements are already satisfied)`);
+    Info(`skipped ${pkg.name}@${pkg.version} (Requirements are already satisfied)`);
     return;
   }
   
@@ -773,7 +793,7 @@ async function downloadAndExtract(pkg) {
       pkg.integrity = registryIntegrity;
     }
 
-    info(`Integrity check ${chalk.bold.green("PASSED")} for ${pkg.name}@${pkg.version}`);
+    Info(`Integrity check ${chalk.bold.green("PASSED")} for ${pkg.name}@${pkg.version}`);
     break; // success
   }
 
@@ -793,7 +813,7 @@ async function downloadAndExtract(pkg) {
   fs.rmSync(temp, { recursive: true, force: true });
   fs.rmSync(destTgz, { force: true });
 
-  info(`installed ${pkg.name}@${pkg.version}`);
+  Info(`installed ${pkg.name}@${pkg.version}`);
 }
 
 
@@ -811,9 +831,12 @@ const VALID_COMMANDS = [
 ];
 
 async function main() {
+if (process.arch !== "x64" && process.arch !== "arm64") {
+    fail("32 bit processors are unsupported, exiting...");
+  }
   const [command, pkgName, pkgVersion] = process.argv.slice(2);
   if (command == null) {
-    info("No command given! If you meant to install your dependencies, run \"calpm install\"");
+    Info("No command given! If you meant to install your dependencies, run \"calpm install\"");
     return;
   }
   if (!VALID_COMMANDS.includes(command)) {
@@ -847,12 +870,12 @@ async function main() {
   if (command === "list-unused") {
     const unused = listUnusedDependencies();
     if (!unused.length) {
-      info("no unused dependencies found");
+      Info("no unused dependencies found");
       return;
     }
-    info("unused dependencies:");
+    Info("unused dependencies:");
     for (const name of unused) {
-      info(`- ${name}`);
+      Info(`- ${name}`);
     }
     return;
   }
@@ -864,20 +887,13 @@ async function main() {
 
   if (command === "install") {
     if (pkgName != null) {
-      info("Install doesn't take any arguments! add a package to your dependencies via calpm add and then rerun!");
+      Info("Install doesn't take any arguments! add a package to your dependencies via calpm add and then rerun!");
     }
     await install();
   }
-
-
-
-
 }
 
 async function install() {
-  if (process.arch !== "x64" && process.arch !== "arm64") {
-    fail("32 bit processors are unsupported, exiting...");
-  }
   const start = performance.now();
   step("reading manifest");
   const manifest = readManifest();
@@ -894,7 +910,7 @@ async function install() {
   step("writing lockfile");
   writeLockfile(resolved);
   const end = performance.now();
-  info(`installation complete, took ${end - start} ms!`);
+  Info(`installation complete, took ${end - start} ms!`);
 }
 
 
