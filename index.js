@@ -26,7 +26,7 @@ import https from "node:https";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import semver from "semver";
-import { Info, step, error, fail, question } from "./log.js";
+import { Info, Step, Error, Fail, Question } from "./log.js";
 import readlineSync from "readline-sync";
 import toml from "@iarna/toml";
 import { performance } from 'node:perf_hooks';
@@ -38,7 +38,7 @@ import chalk from "chalk";
 // ------------------------------------------------------------
 
 function writeManifest(manifest) {
-  step("writing manifest to callum.toml");
+  Step("writing manifest to callum.toml");
   const lines = [];
   lines.push("[dependencies]");
 
@@ -57,7 +57,7 @@ function readManifest(createIfMissing = false) {
       writeManifest(initialManifest);
       return initialManifest;
     }
-    fail('manifest "callum.toml" not found');
+    Fail('manifest "callum.toml" not found');
   }
   const raw = fs.readFileSync("callum.toml", "utf8");
   return toml.parse(raw);
@@ -65,22 +65,22 @@ function readManifest(createIfMissing = false) {
 
 async function addDependencyToManifest(name, version) {
   if (!name) {
-    fail("usage: calpm add <package> <version>");
+    Fail("usage: calpm add <package> <version>");
   }
   if (!semver.valid(version) && version != undefined) {
-    fail("the version needs to conform to the SemVer spec! (MAJOR.MINOR.PATCH)");
+    Fail("the version needs to conform to the SemVer spec! (MAJOR.MINOR.PATCH)");
   }
   else if (!version) {
-	fail("No version specified! Specify a version explicitly! (MAJOR.MINOR.PATCH)");
+	Fail("No version specified! Specify a version explicitly! (MAJOR.MINOR.PATCH)");
   }
   else if (version === "*") {
-	fail("Using * as a version is not allowed! It breaks the updater! Specify a version explicitly! (MAJOR.MINOR.PATCH)");
+	Fail("Using * as a version is not allowed! It breaks the updater! Specify a version explicitly! (MAJOR.MINOR.PATCH)");
   }
   const manifest = readManifest(true);
   const dependencies = manifest.dependencies || {};
   dependencies[name] = version;
   manifest.dependencies = dependencies;
-  const ans = await question(`Is this correct? ${name}@${version} (yes/N)`);
+  const ans = await Question(`Is this correct? ${name}@${version} (yes/N)`);
 
   if (ans.toLowerCase() !== "yes") {
     Info("Add cancelled.");
@@ -111,11 +111,11 @@ async function updateDependenciesInManifest(allowMajorUpgrades = false) {
   const updated = {};
 
   for (const [name, currentRange] of Object.entries(dependencies)) {
-    step(`Trying to update ${name}`)
+    Step(`Trying to update ${name}`)
     try {
       const meta = await fetchJson(`https://registry.npmjs.org/${name}`);
 	  if (!meta) {
-		fail(`failed to fetch metadata for ${name}`);
+		Fail(`failed to fetch metadata for ${name}`);
 	  }
       const versions = Object.keys(meta.versions || {}).filter((version) => semver.valid(version));
       if (!versions.length) {
@@ -157,7 +157,7 @@ async function updateDependenciesInManifest(allowMajorUpgrades = false) {
         Info(`no update needed for ${name} (current: ${currentComparable.version})`);
       }
     } catch (e) {
-      error(`failed to update ${name}: ${e.message} stack: ${e.stack}`);
+      Error(`failed to update ${name}: ${e.message} stack: ${e.stack}`);
       updated[name] = currentRange;
     }
   }
@@ -169,7 +169,7 @@ async function updateDependenciesInManifest(allowMajorUpgrades = false) {
 }
 
 function findDependencyReferences(name) {
-  step(`searching for references to ${name} in codebase`);
+  Step(`searching for references to ${name} in codebase`);
   const root = process.cwd();
   const results = [];
   const visited = new Set();
@@ -216,7 +216,7 @@ function findDependencyReferences(name) {
         results.push(path.relative(root, current));
       }
     } catch {
-      error(`failed to read file: ${current}`);
+      Error(`failed to read file: ${current}`);
     }
   }
 
@@ -225,28 +225,28 @@ function findDependencyReferences(name) {
 
 async function removeDependencyFromManifest(name, breakCodebase = false) {
   if (!name) {
-    fail("usage: node index.js remove <package> [--break-codebase]");
+    Fail("usage: node index.js remove <package> [--break-codebase]");
   }
 
   const manifest = readManifest();
   const dependencies = manifest.dependencies || {};
 
   if (!Object.prototype.hasOwnProperty.call(dependencies, name)) {
-    fail(`dependency "${name}" is not present in callum.toml`);
+    Fail(`dependency "${name}" is not present in callum.toml`);
   }
 
   const references = findDependencyReferences(name);
   if (references.length > 0 && !breakCodebase) {
-    fail(`refusing to remove "${name}" because it is still referenced in the codebase.\nPlease remove those references first or rerun with --break-codebase to force removal. (The following files are affected: ${references.join(", \n")})`);
+    Fail(`refusing to remove "${name}" because it is still referenced in the codebase.\nPlease remove those references first or rerun with --break-codebase to force removal. (The following files are affected: ${references.join(", \n")})`);
   }
   var res = undefined;
   if (breakCodebase) {
-    const res = await question(
+    const res = await Question(
       "WARNING!!!! --break-codebase has been passed and continuing WILL delete the package, even if you still use it. Are you sure? (yes/N)"
     );
 
     if (!res || res.toLowerCase() !== "yes") {
-      fail("User didn't agree to the operation, bailing out!");
+      Fail("User didn't agree to the operation, bailing out!");
     }
   }
 
@@ -332,7 +332,7 @@ function collectJavaScriptReferences(rootDir) {
         references.add(match[1]);
       }
     } catch {
-      error(`Read of ${current} failed!`);
+      Error(`Read of ${current} failed!`);
     }
   }
 
@@ -444,7 +444,7 @@ function autoremoveUnusedDependencies() {
     return;
   }
   for (const name of unused) {
-    step("Removing " + name);
+    Step("Removing " + name);
     const installedDir = path.join(process.cwd(), "node_modules", name);
     if (fs.existsSync(installedDir)) {
       fs.rmSync(installedDir, { recursive: true, force: true });
@@ -453,7 +453,7 @@ function autoremoveUnusedDependencies() {
   const manifest = toml.parse(fs.readFileSync("callum.toml", "utf8"));
 
   for (const name of unused) {
-    step(`removing ${name} from manifest`);
+    Step(`removing ${name} from manifest`);
     delete manifest.dependencies[name];
   }
 
@@ -494,7 +494,7 @@ async function resolvePackage(name, range) {
   const versions = Object.keys(meta.versions || {});
   const picked = semver.maxSatisfying(versions, range);
   if (!picked) {
-    fail(`no version of "${name}" satisfies range "${range}"`);
+    Fail(`no version of "${name}" satisfies range "${range}"`);
   }
   const info = meta.versions[picked];
   Info(`Resolved ${name} to version ${picked.toString()}`);
@@ -515,7 +515,7 @@ function detectConflicts(resolved, requestedRanges) {
 
         for (const range of info.ranges) {
             if (!semver.satisfies(version, range)) {
-                fail(
+                Fail(
                     `dependency conflict for "${name}": ` +
                     `${version} does not satisfy ${range}`
                 );
@@ -550,12 +550,12 @@ async function resolveAll(rootDeps) {
 		const existingVersion = seen.get(pkg.name);
 
 		if (existingVersion !== pkg.version) {
-			error("DEPENDENCY CONFLICT DETECTED!");
-			error(
+			Error("DEPENDENCY CONFLICT DETECTED!");
+			Error(
 			`Package "${pkg.name}" was requested as both ` +
 			`${existingVersion} and ${pkg.version}`
 			);
-			fail("Bailing out!");
+			Fail("Bailing out!");
 		}
 
 		continue;
@@ -612,7 +612,7 @@ function writeLockfile(resolved) {
       (previous && previous.integrity) ||
       undefined;
 
-    step(`Writing lockfile entry for ${pkg.name}@${pkg.version}`);
+    Step(`Writing lockfile entry for ${pkg.name}@${pkg.version}`);
     out += `[[package]] # ${pkg.name}@${pkg.version}\n`;
     out += `name = "${pkg.name}"\n`;
     out += `version = "${pkg.version}"\n`;
@@ -625,7 +625,7 @@ function writeLockfile(resolved) {
 
   fs.writeFileSync("callum-lock.toml", out);
   if (!fs.existsSync("callum-lock.toml")) {
-    fail("Aieee! Callum-lock.toml got destroyed even though we wrote it to disk!!!");
+    Fail("Aieee! Callum-lock.toml got destroyed even though we wrote it to disk!!!");
   }
 }
 
@@ -645,10 +645,10 @@ async function getCachePath(pkg) {
 async function warnIfCacheIsSynced(cacheDir) {
   const oneDrive = process.env.ONE_DRIVE || process.env.ONEDRIVE;
   if (oneDrive && cacheDir.startsWith(oneDrive)) {
-    error("---- IMPORTANT ----");
-    error("It seems like your CalPM cache folder is BEING SYNCED BY ONEDRIVE!!!!");
-    error(`This is VERY bad and ${chalk.bold.red("WILL")} corrupt the cache!!!!`);
-    fail("Bailing out to prevent horrifying bugs!");
+    Error("---- IMPORTANT ----");
+    Error("It seems like your CalPM cache folder is BEING SYNCED BY ONEDRIVE!!!!");
+    Error(`This is VERY bad and ${chalk.bold.red("WILL")} corrupt the cache!!!!`);
+    Fail("Bailing out to prevent horrifying bugs!");
   }
 }
 
@@ -721,13 +721,13 @@ async function downloadAndExtract(pkg) {
 
     
     if (attempt === 1 && fs.existsSync(cacheFile)) {
-      step(`cache hit for ${pkg.name}@${pkg.version}`);
+      Step(`cache hit for ${pkg.name}@${pkg.version}`);
       fs.copyFileSync(cacheFile, destTgz);
     } else {
       if (attempt > 1) {
-        step(`retrying download for ${pkg.name}@${pkg.version} (attempt ${attempt})`);
+        Step(`retrying download for ${pkg.name}@${pkg.version} (attempt ${attempt})`);
       } else {
-        step(`downloading ${pkg.name}@${pkg.version}`);
+        Step(`downloading ${pkg.name}@${pkg.version}`);
       }
 
       await new Promise((resolve, reject) => {
@@ -765,12 +765,12 @@ async function downloadAndExtract(pkg) {
 
     // Compute integrity
     const actualIntegrity = computeFileIntegrity(destTgz);
-    step(`Validating ${pkg.name}@${pkg.version}...`);
+    Step(`Validating ${pkg.name}@${pkg.version}...`);
 
     // Integrity verification
     if (pkg.integrity) {
       if (pkg.integrity !== actualIntegrity) {
-        error(
+        Error(
           `Integrity check ${chalk.bold.red("FAILED")} for ${pkg.name}@${pkg.version}! Retrying! (giving up in ${maxAttempts - attempt} attempts...)`
         );
 
@@ -779,7 +779,7 @@ async function downloadAndExtract(pkg) {
         if (fs.existsSync(destTgz)) fs.rmSync(destTgz, { force: true });
 
         if (attempt === maxAttempts) {
-          fail(
+          Fail(
             `Integrity check ${chalk.bold.red("FAILED")} for ${pkg.name}@${pkg.version} after ${maxAttempts} attempts`
           );
         }
@@ -798,9 +798,9 @@ async function downloadAndExtract(pkg) {
   }
 
   fs.mkdirSync(temp, { recursive: true });
-  step(`Extracting ${pkg.name}@${pkg.version}...`);
+  Step(`Extracting ${pkg.name}@${pkg.version}...`);
   execSync(`tar -xzf "${destTgz}" -C "${temp}"`);
-  step(`Done extracting ${pkg.name}@${pkg.version}!`)
+  Step(`Done extracting ${pkg.name}@${pkg.version}!`)
 
   const pkgDir = path.join(temp, "package");
 
@@ -832,7 +832,7 @@ const VALID_COMMANDS = [
 
 async function main() {
 if (process.arch !== "x64" && process.arch !== "arm64") {
-    fail("32 bit processors are unsupported, exiting...");
+    Fail("32 bit processors are unsupported, exiting...");
   }
   const [command, pkgName, pkgVersion] = process.argv.slice(2);
   if (command == null) {
@@ -840,7 +840,7 @@ if (process.arch !== "x64" && process.arch !== "arm64") {
     return;
   }
   if (!VALID_COMMANDS.includes(command)) {
-    fail(`Unknown command: "${command}"`);
+    Fail(`Unknown command: "${command}"`);
   }
   if (command === "help") {
     console.log("Valid Commands:")
@@ -895,19 +895,19 @@ if (process.arch !== "x64" && process.arch !== "arm64") {
 
 async function install() {
   const start = performance.now();
-  step("reading manifest");
+  Step("reading manifest");
   const manifest = readManifest();
   const rootDeps = manifest.dependencies || {};
 
   fs.mkdirSync("node_modules", { recursive: true });
 
-  step("resolving dependencies");
+  Step("resolving dependencies");
   const resolved = await resolveAll(rootDeps);
 
-  step("downloading and installing packages");
+  Step("downloading and installing packages");
   await Promise.all(resolved.map((pkg) => downloadAndExtract(pkg)));
 
-  step("writing lockfile");
+  Step("writing lockfile");
   writeLockfile(resolved);
   const end = performance.now();
   Info(`installation complete, took ${end - start} ms!`);
@@ -916,6 +916,6 @@ async function install() {
 
 
 main().catch((e) => {
-  error(e.message);
-  fail(`Trace ${e.stack}`);
+  Error(e.message);
+  Fail(`Trace ${e.stack}`);
 });
