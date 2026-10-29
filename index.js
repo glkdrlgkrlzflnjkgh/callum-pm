@@ -506,23 +506,7 @@ async function resolvePackage(name, range) {
   };
 }
 
-function detectConflicts(resolved, requestedRanges) {
-    for (const [name, info] of requestedRanges.entries()) {
-        const version = resolved.find(p => p.name === name)?.version;
 
-        if (!version)
-            continue;
-
-        for (const range of info.ranges) {
-            if (!semver.satisfies(version, range)) {
-                Fail(
-                    `dependency conflict for "${name}": ` +
-                    `${version} does not satisfy ${range}`
-                );
-            }
-        }
-    }
-}
 
 async function resolveAll(rootDeps) {
 	const resolved = [];
